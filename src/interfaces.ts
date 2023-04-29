@@ -8,6 +8,7 @@ export interface SpideyOptions {
   itemConcurrency?: number;
   outputFormat?: OutputFormat;
   outputFileName?: string;
+  logLevel?: 'info' | 'debug' | 'error';
 }
 
 export interface RequestOptions {

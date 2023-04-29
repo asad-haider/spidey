@@ -4,6 +4,7 @@ import { appendFileSync, existsSync, writeFileSync } from 'fs';
 import Queue from './queue';
 import { RequestOptions, SpideyOptions, SpideyResponse, SpideyResponseCallback } from './interfaces';
 import { Constants } from './constants';
+import { createLogger, Logger, transports, format } from 'winston';
 
 export { SpideyOptions, RequestOptions, SpideyResponse };
 
@@ -11,6 +12,7 @@ export class Spidey {
   startUrls: string[] = [];
   requestPipeline: Queue;
   dataPipeline: Queue;
+  logger: Logger;
 
   constructor(private options?: SpideyOptions) {
     this.options = this.setDefaultOptions(options);
@@ -18,8 +20,21 @@ export class Spidey {
     this.requestPipeline = new Queue(this.options.concurrency as number);
     this.dataPipeline = new Queue(this.options.itemConcurrency as number);
 
-    this.requestPipeline.onStart = this.onStart.bind(this);
-    this.requestPipeline.onComplete = this.onComplete.bind(this);
+    this.requestPipeline.on('start', this.onStart);
+    this.requestPipeline.on('complete', this.onComplete);
+
+    this.logger = createLogger({
+      level: this.options.logLevel,
+      format: format.combine(
+        format.timestamp({
+          format: 'YYYY-MM-DD HH:mm:ss',
+        }),
+        format.printf((info) => {
+          return `${info.level.toUpperCase()}: ${info.timestamp} ${info.message}`;
+        }),
+      ),
+      transports: [new transports.Console()],
+    });
   }
 
   start() {
@@ -28,25 +43,27 @@ export class Spidey {
     }
   }
 
-  parse(response: SpideyResponse) {}
+  parse(response: SpideyResponse) {
+    return;
+  }
 
   async request(options: RequestOptions, callback: SpideyResponseCallback) {
     options.method = options.method || 'GET';
     const result = await this.requestPipeline.task(async () => {
       try {
         const response = await this.processRequest(options);
-        console.log(`${options.method}<${response.status}> ${options.url}`);
+        this.logger.debug(`${options.method}<${response.status}> ${options.url}`);
         return { success: true, response };
       } catch (error: any) {
         const statusCode = error.response.status;
         const retryCount = options.meta?.retryCount || 0;
 
         if (this.options?.retryStatusCode?.includes(statusCode) && retryCount < (this.options?.retries as number)) {
-          console.log(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
+          this.logger.debug(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
           options.meta = { ...options.meta, retryCount: retryCount + 1 };
           return this.request(options, callback);
         } else {
-          console.log(`Failed ${options.method}<${error.response.status}> ${options.url}`);
+          this.logger.debug(`Failed ${options.method}<${error.response.status}> ${options.url}`);
           return { success: false, response: error.response };
         }
       }
@@ -94,6 +111,7 @@ export class Spidey {
     options.outputFileName = options?.outputFileName || Constants.DEFAULT_OUTPUT_FILE_NAME;
     options.retries = options?.retries || 0;
     options.retryStatusCode = options?.retryStatusCode || [500, 502, 503, 504, 522, 524, 408, 429];
+    options.logLevel = options?.logLevel || 'debug';
     if (!options?.outputFileName.endsWith(options.outputFormat)) options.outputFileName += `.${options.outputFormat}`;
     return options;
   }

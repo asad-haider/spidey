@@ -1,9 +1,12 @@
-export default class Queue<T = any> {
+import { EventEmitter } from 'events';
+
+export default class Queue<T = any> extends EventEmitter {
   private queue: (() => Promise<T>)[] = [];
   private activeTasks: number = 0;
   private concurrency: number;
 
   public constructor(concurrency: number) {
+    super();
     if (concurrency < 0) {
       throw new Error('Limit cant be lower than 0.');
     }
@@ -12,7 +15,7 @@ export default class Queue<T = any> {
   }
 
   private registerTask(handler: any) {
-    if (this.activeTasks === 0) this.onStart();
+    if (this.activeTasks === 0) this.emit('start');
     this.queue = [...this.queue, handler];
     this.executeTasks();
   }
@@ -38,11 +41,9 @@ export default class Queue<T = any> {
         });
     }
 
-    if (this.activeTasks === 0) this.onComplete();
+    if (this.activeTasks === 0) this.emit('complete');
   }
 
-  public onStart() {}
-  public onComplete() {}
   public length() {
     return this.activeTasks;
   }
