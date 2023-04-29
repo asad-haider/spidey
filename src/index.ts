@@ -5,6 +5,8 @@ import Queue from './queue';
 import { RequestOptions, SpideyOptions, SpideyResponse, SpideyResponseCallback } from './interfaces';
 import { Constants } from './constants';
 
+export { SpideyOptions, RequestOptions, SpideyResponse };
+
 export class Spidey {
   startUrls: string[] = [];
   requestPipeline: Queue;
@@ -22,21 +24,43 @@ export class Spidey {
 
   start() {
     for (const url of this.startUrls) {
-      this.request({ url }, this.parse.bind(this));
+      this.request({ url, method: 'GET' }, this.parse.bind(this));
     }
   }
 
   parse(response: SpideyResponse) {}
 
   async request(options: RequestOptions, callback: SpideyResponseCallback) {
-    const result = await this.requestPipeline.task(() => this.processRequest(options));
-    const response = {
-      ...result,
-      meta: options?.meta,
-      $: cheerio.load(result.data),
-    };
-    if (options.inline) return response;
-    return callback(response);
+    options.method = options.method || 'GET';
+    const result = await this.requestPipeline.task(async () => {
+      try {
+        const response = await this.processRequest(options);
+        console.log(`${options.method}<${response.status}> ${options.url}`);
+        return { success: true, response };
+      } catch (error: any) {
+        const statusCode = error.response.status;
+        const retryCount = options.meta?.retryCount || 0;
+
+        if (this.options?.retryStatusCode?.includes(statusCode) && retryCount < (this.options?.retries as number)) {
+          console.log(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
+          options.meta = { ...options.meta, retryCount: retryCount + 1 };
+          return this.request(options, callback);
+        } else {
+          console.log(`Failed ${options.method}<${error.response.status}> ${options.url}`);
+          return { success: false, response: error.response };
+        }
+      }
+    });
+
+    if (result && result.success) {
+      const response = {
+        ...result.response,
+        meta: options?.meta,
+        $: cheerio.load(result.response.data),
+      };
+      if (options.inline) return response;
+      return callback(response);
+    }
   }
 
   save(data: any) {
@@ -68,6 +92,8 @@ export class Spidey {
     options.delay = options?.delay || Constants.DEFAULT_DELAY;
     options.outputFormat = options?.outputFormat || Constants.DEFAULT_OUTPUT_FORMAT;
     options.outputFileName = options?.outputFileName || Constants.DEFAULT_OUTPUT_FILE_NAME;
+    options.retries = options?.retries || 0;
+    options.retryStatusCode = options?.retryStatusCode || [500, 502, 503, 504, 522, 524, 408, 429];
     if (!options?.outputFileName.endsWith(options.outputFormat)) options.outputFileName += `.${options.outputFormat}`;
     return options;
   }
@@ -75,11 +101,13 @@ export class Spidey {
   private async processRequest(options: RequestOptions): Promise<AxiosResponse> {
     return axios.request({
       url: options.url,
-      method: options.method || 'GET',
+      method: options.method,
       headers: options.headers,
       data: options.body,
       timeout: options.timeout,
-      responseType: options.json ? 'json' : 'text',
+      withCredentials: true,
+      responseType: options.json ? 'json' : 'document',
+      validateStatus: (status) => status < 400,
     });
   }
 

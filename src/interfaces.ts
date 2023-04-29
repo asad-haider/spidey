@@ -3,6 +3,8 @@ import { AxiosResponse } from 'axios';
 export interface SpideyOptions {
   concurrency?: number;
   delay?: number;
+  retries?: number;
+  retryStatusCode?: number[];
   itemConcurrency?: number;
   outputFormat?: OutputFormat;
   outputFileName?: string;
