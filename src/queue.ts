@@ -26,19 +26,20 @@ export default class Queue<T = any> extends EventEmitter {
       this.queue = this.queue.slice(1);
       this.activeTasks += 1;
 
-      task()
-        .then((result) => {
-          this.activeTasks -= 1;
-          this.executeTasks();
+      if (task)
+        task()
+          .then((result) => {
+            this.activeTasks -= 1;
+            this.executeTasks();
 
-          return result;
-        })
-        .catch((err) => {
-          this.activeTasks -= 1;
-          this.executeTasks();
+            return result;
+          })
+          .catch((err) => {
+            this.activeTasks -= 1;
+            this.executeTasks();
 
-          throw err;
-        });
+            throw err;
+          });
     }
 
     if (this.activeTasks === 0) this.emit('complete');

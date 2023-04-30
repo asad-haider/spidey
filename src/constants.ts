@@ -1,4 +1,4 @@
-import { OutputFormat } from './interfaces';
+import { OutputFormat } from './interfaces.js';
 
 export class Constants {
   static readonly DEFAULT_CONCURRENCY = 10;

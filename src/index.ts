@@ -14,7 +14,7 @@ export class Spidey {
   dataPipeline: Queue;
   logger: Logger;
 
-  constructor(private options?: SpideyOptions) {
+  constructor(public options?: SpideyOptions) {
     this.options = this.setDefaultOptions(options);
 
     this.requestPipeline = new Queue(this.options.concurrency as number);
@@ -29,7 +29,7 @@ export class Spidey {
         format.timestamp({
           format: 'YYYY-MM-DD HH:mm:ss',
         }),
-        format.printf((info) => {
+        format.printf((info: any) => {
           return `${info.level.toUpperCase()}: ${info.timestamp} ${info.message}`;
         }),
       ),
@@ -39,11 +39,11 @@ export class Spidey {
 
   start() {
     for (const url of this.startUrls) {
-      this.request({ url, method: 'GET' }, this.parse.bind(this));
+      this.request({ url, method: 'GET' }, this.parse?.bind(this));
     }
   }
 
-  parse(response: SpideyResponse) {
+  parse(_response: SpideyResponse) {
     return;
   }
 

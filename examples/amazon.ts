@@ -1,4 +1,4 @@
-import { Spidey, SpideyResponse } from '../lib/index';
+import { Spidey, SpideyResponse } from '../dist/index';
 
 class AmazonSpidey extends Spidey {
   constructor() {
