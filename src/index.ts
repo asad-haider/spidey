@@ -20,8 +20,8 @@ export class Spidey {
     this.requestPipeline = new Queue(this.options.concurrency as number);
     this.dataPipeline = new Queue(this.options.itemConcurrency as number);
 
-    this.requestPipeline.on('start', this.onStart);
-    this.requestPipeline.on('complete', this.onComplete);
+    this.requestPipeline.on('start', this.onStart.bind(this));
+    this.requestPipeline.on('complete', this.onComplete.bind(this));
 
     this.logger = createLogger({
       level: this.options.logLevel,

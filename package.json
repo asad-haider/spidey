@@ -4,10 +4,11 @@
   "description": "Robust web spider for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
+  "type": "module",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "build": "tsc",
-    "format": "prettier --write \"src/**/*.ts\" \"src/**/*.js\"",
+    "format": "prettier --write \"src/**/*.ts\"",
     "lint": "tslint -p tsconfig.json",
     "prepare": "npm run build",
     "prepublishOnly": "npm run lint",
