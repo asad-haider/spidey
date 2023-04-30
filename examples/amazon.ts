@@ -3,9 +3,8 @@ import { Spidey, SpideyResponse } from '../dist/index';
 class AmazonSpidey extends Spidey {
   constructor() {
     super({
-      concurrency: 5,
-      retries: 10,
-      proxyUrl: 'http://ytzmknkj:ytQ9FpHD093QH8BE@proxy.proxy-cheap.com:31112',
+      concurrency: 30,
+      retries: 5,
     });
   }
 
@@ -47,15 +46,10 @@ class AmazonSpidey extends Spidey {
 
   start() {
     for (const url of this.startUrls) {
-      // const proxyUrl = `http://api.scraperapi.com?api_key=2336a21bd6902e216ddab634e4ecad7c&url=${url}`;
       this.request(
         {
-          // url: proxyUrl,
           url,
           headers: this.headers,
-          meta: {
-            url,
-          },
         },
         this.parse.bind(this),
       );
@@ -69,10 +63,8 @@ class AmazonSpidey extends Spidey {
     });
 
     productUrls.forEach((url) => {
-      // const proxyUrl = `http://api.scraperapi.com?api_key=2336a21bd6902e216ddab634e4ecad7c&url=https://www.amazon.de${url}`;
       this.request(
         {
-          // url: proxyUrl,
           url: `https://www.amazon.de${url}`,
           headers: this.headers,
           meta: {
@@ -90,24 +82,5 @@ class AmazonSpidey extends Spidey {
     this.save({ url, title });
   }
 }
-
-process.on('beforeExit', (code) => {
-  console.log('Process beforeExit event with code: ', code);
-});
-
-process.on('exit', (code) => {
-  console.log('Process exit event with code: ', code);
-});process.on('SIGINT', () => {
-  console.log('Process - SIGINT');
-});
-process.on('SIGUSR1', () => {
-  console.log('Process - SIGUSR1');
-});
-process.on('SIGUSR2', () => {
-  console.log('Process - SIGUSR2');
-});
-process.on('uncaughtException', () => {
-  console.log('Process - uncaughtException');
-});
 
 new AmazonSpidey().start();

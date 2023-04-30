@@ -5,6 +5,7 @@ import Queue from './queue';
 import { RequestOptions, SpideyOptions, SpideyResponse, SpideyResponseCallback } from './interfaces';
 import { Constants } from './constants';
 import { createLogger, Logger, transports, format } from 'winston';
+import { parse } from 'url';
 
 export { SpideyOptions, RequestOptions, SpideyResponse };
 
@@ -47,7 +48,7 @@ export class Spidey {
     return;
   }
 
-  async request(options: RequestOptions, callback: SpideyResponseCallback) {
+  async request(options: RequestOptions, callback: SpideyResponseCallback): Promise<void | SpideyResponse> {
     options.method = options.method || 'GET';
     const result = await this.requestPipeline.task(async () => {
       try {
@@ -64,26 +65,26 @@ export class Spidey {
         ) {
           if (statusCode) this.logger.debug(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
           else this.logger.debug(`Failed, retrying ${options.method} ${options.url}`);
-
           options.meta = { ...options.meta, retryCount: retryCount + 1 };
-          return this.request(options, callback);
+          return { success: false, retry: true };
         } else {
           if (statusCode) this.logger.debug(`Failed ${options.method}<${statusCode}> ${options.url}`);
           else this.logger.debug(`Failed ${options.method} ${options.url}`);
-          return { success: false, response: error.response };
+          return { success: false, retry: false };
         }
       }
     });
 
-    if (result && result.success) {
-      const response = {
-        ...result.response,
-        meta: options?.meta,
-        $: cheerio.load(result.response.data),
-      };
-      if (options.inline) return response;
-      return callback(response);
-    }
+    if (result?.retry) return this.request(options, callback);
+    if (!result?.success) return;
+
+    const response = {
+      ...result.response,
+      meta: options?.meta,
+      $: cheerio.load(result.response.data),
+    };
+    if (options.inline) return response;
+    return callback(response);
   }
 
   save(data: any) {
@@ -162,21 +163,24 @@ export class Spidey {
     else return false;
   }
 
-  private parseProxyUrl(proxyUrl: string): AxiosProxyConfig {
-    const authRegex = /\/\/(.+):(.+)@/;
-    const [match, username, password] = proxyUrl.match(authRegex) || [null, null, null];
-    const { protocol, hostname, port } = new URL(proxyUrl);
-    const proxy: AxiosProxyConfig = {
-      protocol: protocol.replace(':', ''),
-      host: hostname,
-      port: parseInt(port),
-    };
-    if (username && password) {
-      proxy.auth = {
-        username,
-        password,
+  private parseProxyUrl(proxyUrl: string): AxiosProxyConfig | false {
+    try {
+      const parsedUrl = parse(proxyUrl);
+      const proxy: AxiosProxyConfig = {
+        protocol: parsedUrl?.protocol?.replace(':', ''),
+        host: parsedUrl.hostname as string,
+        port: +(parsedUrl.port as string),
       };
+      if (parsedUrl.auth) {
+        const auth = parsedUrl.auth.split(':');
+        proxy.auth = {
+          username: auth[0],
+          password: auth[1],
+        };
+      }
+      return proxy;
+    } catch (error) {
+      return false;
     }
-    return proxy;
   }
 }
