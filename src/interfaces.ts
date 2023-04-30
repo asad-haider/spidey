@@ -1,5 +1,14 @@
 import { AxiosResponse } from 'axios';
 
+interface SpdieyProxy {
+  host: string;
+  port: number;
+  auth?: {
+    username: string;
+    password: string;
+  };
+}
+
 export interface SpideyOptions {
   concurrency?: number;
   delay?: number;
@@ -9,6 +18,8 @@ export interface SpideyOptions {
   outputFormat?: OutputFormat;
   outputFileName?: string;
   logLevel?: 'info' | 'debug' | 'error';
+  proxy?: SpdieyProxy;
+  proxyUrl?: string;
 }
 
 export interface RequestOptions {
@@ -20,6 +31,8 @@ export interface RequestOptions {
   timeout?: number;
   meta?: any;
   inline?: boolean;
+  proxy?: SpdieyProxy;
+  proxyUrl?: string;
 }
 
 export interface SpideyResponse extends AxiosResponse {

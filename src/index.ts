@@ -1,4 +1,4 @@
-import axios, { AxiosResponse } from 'axios';
+import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
 import { appendFileSync, existsSync, writeFileSync } from 'fs';
 import Queue from './queue';
@@ -55,15 +55,21 @@ export class Spidey {
         this.logger.debug(`${options.method}<${response.status}> ${options.url}`);
         return { success: true, response };
       } catch (error: any) {
-        const statusCode = error.response.status;
+        const statusCode = error?.response?.status;
         const retryCount = options.meta?.retryCount || 0;
 
-        if (this.options?.retryStatusCode?.includes(statusCode) && retryCount < (this.options?.retries as number)) {
-          this.logger.debug(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
+        if (
+          (!error?.response || this.options?.retryStatusCode?.includes(statusCode)) &&
+          retryCount < (this.options?.retries as number)
+        ) {
+          if (statusCode) this.logger.debug(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
+          else this.logger.debug(`Failed, retrying ${options.method} ${options.url}`);
+
           options.meta = { ...options.meta, retryCount: retryCount + 1 };
           return this.request(options, callback);
         } else {
-          this.logger.debug(`Failed ${options.method}<${error.response.status}> ${options.url}`);
+          if (statusCode) this.logger.debug(`Failed ${options.method}<${statusCode}> ${options.url}`);
+          else this.logger.debug(`Failed ${options.method} ${options.url}`);
           return { success: false, response: error.response };
         }
       }
@@ -126,6 +132,8 @@ export class Spidey {
       withCredentials: true,
       responseType: options.json ? 'json' : 'document',
       validateStatus: (status) => status < 400,
+      maxRedirects: 3,
+      proxy: this.getProxy(options),
     });
   }
 
@@ -144,5 +152,31 @@ export class Spidey {
         }
         break;
     }
+  }
+
+  private getProxy(requestOptions?: RequestOptions) {
+    const proxyUrl = requestOptions?.proxyUrl || this.options?.proxyUrl;
+    const proxy = requestOptions?.proxy || this.options?.proxy;
+    if (proxyUrl) return this.parseProxyUrl(proxyUrl);
+    else if (proxy) return proxy;
+    else return false;
+  }
+
+  private parseProxyUrl(proxyUrl: string): AxiosProxyConfig {
+    const authRegex = /\/\/(.+):(.+)@/;
+    const [match, username, password] = proxyUrl.match(authRegex) || [null, null, null];
+    const { protocol, hostname, port } = new URL(proxyUrl);
+    const proxy: AxiosProxyConfig = {
+      protocol: protocol.replace(':', ''),
+      host: hostname,
+      port: parseInt(port),
+    };
+    if (username && password) {
+      proxy.auth = {
+        username,
+        password,
+      };
+    }
+    return proxy;
   }
 }
