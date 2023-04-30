@@ -78,13 +78,13 @@ export class Spidey {
     if (result?.retry) return this.request(options, callback);
     if (!result?.success) return;
 
-    const response = {
+    const spideyResponse = {
       ...result.response,
       meta: options?.meta,
       $: cheerio.load(result.response.data),
     };
-    if (options.inline) return response;
-    return callback(response);
+    if (options.inline) return spideyResponse;
+    return callback(spideyResponse);
   }
 
   save(data: any) {
