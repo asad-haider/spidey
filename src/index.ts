@@ -6,6 +6,8 @@ import { RequestOptions, SpideyOptions, SpideyResponse, SpideyResponseCallback }
 import { Constants } from './constants';
 import { createLogger, Logger, transports, format } from 'winston';
 import { parse } from 'url';
+import { select } from 'xpath';
+import { DOMParser } from 'xmldom';
 
 export { SpideyOptions, RequestOptions, SpideyResponse };
 
@@ -78,11 +80,7 @@ export class Spidey {
     if (result?.retry) return this.request(options, callback);
     if (!result?.success) return;
 
-    const spideyResponse = {
-      ...result.response,
-      meta: options?.meta,
-      $: cheerio.load(result.response.data),
-    };
+    const spideyResponse = this.getSpideyResponse(options, result);
     if (options.inline) return spideyResponse;
     return callback(spideyResponse);
   }
@@ -107,6 +105,24 @@ export class Spidey {
         appendFileSync(fileName, ']');
         break;
     }
+  }
+
+  private getSpideyResponse(options: RequestOptions, result: any) {
+    const tree = new DOMParser({
+      locator: {},
+      errorHandler: {
+        error: () => undefined,
+        warning: () => undefined,
+        fatalError: () => undefined,
+      },
+    }).parseFromString(result.response.data, 'text/html');
+
+    return {
+      ...result.response,
+      meta: options?.meta,
+      $: cheerio.load(result.response.data),
+      xpath: (selector: string, node?: any) => select(selector, node ?? tree),
+    };
   }
 
   private setDefaultOptions(options?: SpideyOptions) {

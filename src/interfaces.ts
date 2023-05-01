@@ -37,6 +37,7 @@ export interface RequestOptions {
 
 export interface SpideyResponse extends AxiosResponse {
   $: any;
+  xpath: any;
   meta?: any;
 }
 

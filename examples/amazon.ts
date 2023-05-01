@@ -40,8 +40,8 @@ class AmazonSpidey extends Spidey {
 
   startUrls = [
     'https://www.amazon.de/-/en/gp/bestsellers/beauty/64272031/ref=zg_bs_nav_beauty_1',
-    'https://www.amazon.de/-/en/gp/bestsellers/beauty/122877031/ref=zg_bs_nav_beauty_1',
-    'https://www.amazon.de/-/en/gp/bestsellers/beauty/64486031/ref=zg_bs_nav_beauty_1',
+    // 'https://www.amazon.de/-/en/gp/bestsellers/beauty/122877031/ref=zg_bs_nav_beauty_1',
+    // 'https://www.amazon.de/-/en/gp/bestsellers/beauty/64486031/ref=zg_bs_nav_beauty_1',
   ];
 
   start() {
@@ -78,7 +78,9 @@ class AmazonSpidey extends Spidey {
 
   parseProduct(response: SpideyResponse) {
     const url = response.meta.url;
-    const title = response.$('#productTitle').text().trim();
+    const title = response.xpath('//*[@id="productTitle"]/text()')[0].data.trim();
+    const titleCss = response.$('#productTitle').text().trim();
+    console.log(title, titleCss);
     this.save({ url, title });
   }
 }
