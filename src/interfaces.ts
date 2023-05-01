@@ -39,11 +39,12 @@ export interface SpideyResponse extends AxiosResponse {
   $: any;
   xpath: any;
   meta?: any;
+  url: string;
 }
 
 export interface SpideyPipeline {
   process(data: any, last?: boolean): any;
-  complete(): any;
+  complete?(): any;
 }
 
 export declare type OutputFormat = 'json' | 'csv' | 'tsv' | 'txt';

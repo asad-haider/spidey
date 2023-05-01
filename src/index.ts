@@ -15,10 +15,10 @@ type ISpideyPipeline = new (options?: SpideyOptions) => SpideyPipeline;
 export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
 
 export class Spidey {
+  logger: Logger;
   startUrls: string[] = [];
   private requestPipeline: Queue;
   private dataPipeline: Queue;
-  private logger: Logger;
   private pipelineRegistry: ISpideyPipeline[] = [];
   private pipeline: SpideyPipeline[] = [];
 
@@ -113,6 +113,10 @@ export class Spidey {
     }
   }
 
+  scheduledRequestsCount() {
+    return this.requestPipeline.length();
+  }
+
   private getSpideyResponse(options: RequestOptions, result: any) {
     const tree = new DOMParser({
       locator: {},
@@ -126,6 +130,7 @@ export class Spidey {
     return {
       ...result.response,
       meta: options?.meta,
+      url: result.response.config.url,
       $: cheerio.load(result.response.data),
       xpath: (selector: string, node?: any) => select(selector, node ?? tree),
     };
