@@ -41,5 +41,10 @@ export interface SpideyResponse extends AxiosResponse {
   meta?: any;
 }
 
+export interface SpideyPipeline {
+  process(data: any, last?: boolean): any;
+  complete(): any;
+}
+
 export declare type OutputFormat = 'json' | 'csv' | 'tsv' | 'txt';
 export declare type SpideyResponseCallback = (response: SpideyResponse) => void;

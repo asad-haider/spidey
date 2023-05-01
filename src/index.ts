@@ -2,22 +2,27 @@ import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
 import { appendFileSync, existsSync, writeFileSync } from 'fs';
 import Queue from './queue';
-import { RequestOptions, SpideyOptions, SpideyResponse, SpideyResponseCallback } from './interfaces';
+import { RequestOptions, SpideyOptions, SpideyPipeline, SpideyResponse, SpideyResponseCallback } from './interfaces';
 import { Constants } from './constants';
 import { createLogger, Logger, transports, format } from 'winston';
 import { parse } from 'url';
 import { select } from 'xpath';
 import { DOMParser } from 'xmldom';
+import { JsonPipeline } from './pipeline';
 
-export { SpideyOptions, RequestOptions, SpideyResponse };
-
+export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
+interface ISpideyPipeline {
+  new (options?: SpideyOptions): SpideyPipeline;
+}
 export class Spidey {
   startUrls: string[] = [];
-  requestPipeline: Queue;
-  dataPipeline: Queue;
-  logger: Logger;
+  private requestPipeline: Queue;
+  private dataPipeline: Queue;
+  private logger: Logger;
+  private pipelineRegistry: ISpideyPipeline[] = [];
+  private pipeline: SpideyPipeline[] = [];
 
-  constructor(public options?: SpideyOptions) {
+  constructor(private options?: SpideyOptions) {
     this.options = this.setDefaultOptions(options);
 
     this.requestPipeline = new Queue(this.options.concurrency as number);
@@ -38,6 +43,16 @@ export class Spidey {
       ),
       transports: [new transports.Console()],
     });
+
+    switch (this.options?.outputFormat) {
+      case 'json':
+        this.use(JsonPipeline);
+        break;
+    }
+  }
+
+  use(pipeline: ISpideyPipeline) {
+    this.pipelineRegistry.unshift(pipeline);
   }
 
   start() {
@@ -90,20 +105,12 @@ export class Spidey {
   }
 
   onStart() {
-    const fileName = this.options?.outputFileName as string;
-    switch (this.options?.outputFormat) {
-      case 'json':
-        writeFileSync(fileName, '[');
-        break;
-    }
+    this.pipeline = this.pipelineRegistry.map((pipeline: any) => new pipeline(this.options));
   }
 
   onComplete() {
-    const fileName = this.options?.outputFileName as string;
-    switch (this.options?.outputFormat) {
-      case 'json':
-        appendFileSync(fileName, ']');
-        break;
+    for (const pipeline of this.pipeline) {
+      pipeline.complete();
     }
   }
 
@@ -155,19 +162,8 @@ export class Spidey {
   }
 
   private async processData(data: any) {
-    const fileName = this.options?.outputFileName as string;
-    switch (this.options?.outputFormat) {
-      case 'json':
-        if (!existsSync(fileName)) {
-          appendFileSync(fileName, '[');
-        } else {
-          if (this.requestPipeline.length() === 1) {
-            appendFileSync(fileName, JSON.stringify(data));
-          } else {
-            appendFileSync(fileName, JSON.stringify(data) + ',');
-          }
-        }
-        break;
+    for (const pipeline of this.pipeline) {
+      data = pipeline.process(data, this.requestPipeline.length() === 1);
     }
   }
 

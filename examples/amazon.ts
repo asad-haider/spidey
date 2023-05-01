@@ -1,4 +1,15 @@
-import { Spidey, SpideyResponse } from '../dist/index';
+import { Spidey, SpideyOptions, SpideyPipeline, SpideyResponse } from '../dist/index';
+
+export class CustomPipeline implements SpideyPipeline {
+  constructor(private options?: SpideyOptions) {}
+
+  process(data: any, last?: boolean) {
+    data.name = '123';
+    return data;
+  }
+
+  complete() {}
+}
 
 class AmazonSpidey extends Spidey {
   constructor() {
@@ -6,6 +17,8 @@ class AmazonSpidey extends Spidey {
       concurrency: 30,
       retries: 5,
     });
+
+    this.use(CustomPipeline);
   }
 
   headers = {
@@ -62,7 +75,9 @@ class AmazonSpidey extends Spidey {
       productUrls.add(response.$(element).attr('href'));
     });
 
-    productUrls.forEach((url) => {
+    const urls = Array.from(productUrls);
+
+    urls.slice(0, 5).forEach((url) => {
       this.request(
         {
           url: `https://www.amazon.de${url}`,
