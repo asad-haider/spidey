@@ -10,10 +10,9 @@ import { select } from 'xpath';
 import { DOMParser } from 'xmldom';
 import { JsonPipeline } from './pipeline';
 
+type ISpideyPipeline = new (options?: SpideyOptions) => SpideyPipeline;
 export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
-interface ISpideyPipeline {
-  new (options?: SpideyOptions): SpideyPipeline;
-}
+
 export class Spidey {
   startUrls: string[] = [];
   private requestPipeline: Queue;
