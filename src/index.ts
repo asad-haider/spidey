@@ -11,6 +11,7 @@ import { DOMParser } from 'xmldom';
 import { JsonPipeline } from './pipeline';
 
 type ISpideyPipeline = new (options?: SpideyOptions) => SpideyPipeline;
+
 export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
 
 export class Spidey {
@@ -42,16 +43,10 @@ export class Spidey {
       ),
       transports: [new transports.Console()],
     });
-
-    switch (this.options?.outputFormat) {
-      case 'json':
-        this.use(JsonPipeline);
-        break;
-    }
   }
 
   use(pipeline: ISpideyPipeline) {
-    this.pipelineRegistry.unshift(pipeline);
+    this.pipelineRegistry.push(pipeline);
   }
 
   start() {
@@ -104,12 +99,17 @@ export class Spidey {
   }
 
   onStart() {
-    this.pipeline = this.pipelineRegistry.map((pipeline: any) => new pipeline(this.options));
+    switch (this.options?.outputFormat) {
+      case 'json':
+        this.use(JsonPipeline);
+        break;
+    }
+    this.pipeline = this.pipelineRegistry.map((Pipeline: ISpideyPipeline) => new Pipeline(this.options));
   }
 
   onComplete() {
     for (const pipeline of this.pipeline) {
-      pipeline.complete();
+      if (pipeline.complete) pipeline.complete();
     }
   }
 
@@ -164,6 +164,8 @@ export class Spidey {
     for (const pipeline of this.pipeline) {
       data = pipeline.process(data, this.requestPipeline.length() === 1);
     }
+
+    this.logger.debug(`Crawled ${JSON.stringify(data, null, 2)}`);
   }
 
   private getProxy(requestOptions?: RequestOptions) {
