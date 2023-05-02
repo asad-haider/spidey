@@ -1,6 +1,6 @@
 {
-  "name": "spidey-js",
-  "version": "1.0.10",
+  "name": "spidey",
+  "version": "1.0.1",
   "description": "Robust web spider for Node.js",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
