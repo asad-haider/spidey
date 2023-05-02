@@ -144,7 +144,7 @@ export class Spidey {
     for (const pipeline of this.pipeline) {
       if (pipeline.complete) pipeline.complete();
     }
-    this.statsInterval && clearInterval(this.statsInterval);
+    if (this.statsInterval) clearInterval(this.statsInterval);
 
     this.savePerMinuteStats();
     this.logger.info(
