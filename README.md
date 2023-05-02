@@ -49,6 +49,37 @@ spidey.request({
 spider.start();
 ```
 
+Spidey can also be used by extending as Class
+
+```typescript
+class AmazonSpidey extends Spidey {
+  constructor() {
+    super({
+      concurrency: 10,
+      retries: 5,
+    });
+  }
+
+  headers = {
+    'user-agent':
+      'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/112.0.0.0 Safari/537.36',
+  };
+
+  startUrls = [
+    'https://www.amazon.de/-/en/Amazon-Liquid-Soap-Refill-Fragrance/dp/B0996J4VV2',
+    'https://www.amazon.de/Dancing-Interactive-Educational-Children-Recording/dp/B0BLVKYXXQ',
+  ];
+
+  parse(response: SpideyResponse) {
+    const url = response.url;
+    const title = response.xpath('//*[@id="productTitle"]/text()')[0].data.trim();
+    this.save({ url, title });
+  }
+}
+
+new AmazonSpidey().start();
+```
+
 
 ## License
 
