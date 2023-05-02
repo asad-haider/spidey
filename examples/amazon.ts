@@ -19,8 +19,9 @@ export class ASINPipeline implements SpideyPipeline {
 class AmazonSpidey extends Spidey {
   constructor() {
     super({
-      concurrency: 50,
+      concurrency: 2,
       retries: 5,
+      logLevel: 'info',
     });
 
     this.use(ASINPipeline);

@@ -2,7 +2,14 @@ import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
 import { appendFileSync, existsSync, writeFileSync } from 'fs';
 import Queue from './queue';
-import { RequestOptions, SpideyOptions, SpideyPipeline, SpideyResponse, SpideyResponseCallback } from './interfaces';
+import {
+  RequestOptions,
+  SpideyOptions,
+  SpideyPipeline,
+  SpideyResponse,
+  SpideyResponseCallback,
+  SpideyStatistics,
+} from './interfaces';
 import { Constants } from './constants';
 import { createLogger, Logger, transports, format } from 'winston';
 import { parse } from 'url';
@@ -15,34 +22,47 @@ type ISpideyPipeline = new (options?: SpideyOptions) => SpideyPipeline;
 export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
 
 export class Spidey {
-  logger: Logger;
+  logger!: Logger;
   startUrls: string[] = [];
+
   private requestPipeline: Queue;
   private dataPipeline: Queue;
   private pipelineRegistry: ISpideyPipeline[] = [];
   private pipeline: SpideyPipeline[] = [];
+  private statsInterval: NodeJS.Timeout;
+  private totalStats: SpideyStatistics = {
+    requests: 0,
+    items: 0,
+    retries: 0,
+    success: 0,
+    failed: 0,
+  };
+  private perMinuteStats: SpideyStatistics = {
+    requests: 0,
+    items: 0,
+    retries: 0,
+    success: 0,
+    failed: 0,
+  };
 
   constructor(private options?: SpideyOptions) {
+    // setting default options
     this.options = this.setDefaultOptions(options);
 
-    this.requestPipeline = new Queue(this.options.concurrency as number);
+    this.initializeLogger();
+
+    this.requestPipeline = new Queue(this.options.concurrency as number, this.options?.continuous as boolean);
     this.dataPipeline = new Queue(this.options.itemConcurrency as number);
 
-    this.requestPipeline.on('start', this.onStart.bind(this));
     this.requestPipeline.on('complete', this.onComplete.bind(this));
+    this.onStart();
 
-    this.logger = createLogger({
-      level: this.options.logLevel,
-      format: format.combine(
-        format.timestamp({
-          format: 'YYYY-MM-DD HH:mm:ss',
-        }),
-        format.printf((info: any) => {
-          return `${info.level.toUpperCase()}: ${info.timestamp} ${info.message}`;
-        }),
-      ),
-      transports: [new transports.Console()],
-    });
+    this.statsInterval = setInterval(() => {
+      this.logger.info(`Crawled ${this.perMinuteStats.requests} pages, ${this.perMinuteStats.items} items per minute`);
+
+      this.savePerMinuteStats();
+      this.resetStats();
+    }, 60 * 1000);
   }
 
   use(pipeline: ISpideyPipeline) {
@@ -62,6 +82,7 @@ export class Spidey {
   async request(options: RequestOptions, callback: SpideyResponseCallback): Promise<void | SpideyResponse> {
     options.method = options.method || 'GET';
     const result = await this.requestPipeline.task(async () => {
+      this.perMinuteStats.requests++;
       try {
         const response = await this.processRequest(options);
         this.logger.debug(`${options.method}<${response.status}> ${options.url}`);
@@ -77,10 +98,12 @@ export class Spidey {
           if (statusCode) this.logger.debug(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
           else this.logger.debug(`Failed, retrying ${options.method} ${options.url}`);
           options.meta = { ...options.meta, retryCount: retryCount + 1 };
+          this.perMinuteStats.retries++;
           return { success: false, retry: true };
         } else {
           if (statusCode) this.logger.debug(`Failed ${options.method}<${statusCode}> ${options.url}`);
           else this.logger.debug(`Failed ${options.method} ${options.url}`);
+          this.perMinuteStats.failed++;
           return { success: false, retry: false };
         }
       }
@@ -90,15 +113,25 @@ export class Spidey {
     if (!result?.success) return;
 
     const spideyResponse = this.getSpideyResponse(options, result);
+    this.perMinuteStats.success++;
     if (options.inline) return spideyResponse;
     return callback(spideyResponse);
   }
 
   save(data: any) {
-    this.dataPipeline.task(() => this.processData(data));
+    this.dataPipeline.task(() => {
+      this.perMinuteStats.items++;
+      return this.processData(data);
+    });
   }
 
-  onStart() {
+  scheduledRequestsCount() {
+    return this.requestPipeline.length();
+  }
+
+  private onStart() {
+    this.logger.info(`Spidey process started`);
+
     switch (this.options?.outputFormat) {
       case 'json':
         this.use(JsonPipeline);
@@ -107,14 +140,16 @@ export class Spidey {
     this.pipeline = this.pipelineRegistry.map((Pipeline: ISpideyPipeline) => new Pipeline(this.options));
   }
 
-  onComplete() {
+  private onComplete() {
     for (const pipeline of this.pipeline) {
       if (pipeline.complete) pipeline.complete();
     }
-  }
+    this.statsInterval && clearInterval(this.statsInterval);
 
-  scheduledRequestsCount() {
-    return this.requestPipeline.length();
+    this.savePerMinuteStats();
+    this.logger.info(
+      `Spidey process completed\nTotal Requests: ${this.totalStats.requests}\nTotal Items: ${this.totalStats.items}\nTotal Success: ${this.totalStats.success}\nTotal Failed: ${this.totalStats.failed}\nTotal Retries: ${this.totalStats.retries}`,
+    );
   }
 
   private getSpideyResponse(options: RequestOptions, result: any) {
@@ -141,12 +176,15 @@ export class Spidey {
     options.concurrency = options?.concurrency || Constants.DEFAULT_CONCURRENCY;
     options.itemConcurrency = options?.itemConcurrency || options?.concurrency;
     options.delay = options?.delay || Constants.DEFAULT_DELAY;
+    options.retries = options?.retries || Constants.DEFAULT_RETRIES;
+    options.retryStatusCode = options?.retryStatusCode || Constants.DEFAULT_RETRY_STATUS_CODE;
+    options.logLevel = options?.logLevel || Constants.DEFAULT_DEBUG_LEVEL;
+    options.continuous = options.continuous ?? Constants.DEFAULT_SPIDEY_STATE;
+
     options.outputFormat = options?.outputFormat || Constants.DEFAULT_OUTPUT_FORMAT;
     options.outputFileName = options?.outputFileName || Constants.DEFAULT_OUTPUT_FILE_NAME;
-    options.retries = options?.retries || 0;
-    options.retryStatusCode = options?.retryStatusCode || [500, 502, 503, 504, 522, 524, 408, 429];
-    options.logLevel = options?.logLevel || 'debug';
     if (!options?.outputFileName.endsWith(options.outputFormat)) options.outputFileName += `.${options.outputFormat}`;
+
     return options;
   }
 
@@ -200,5 +238,38 @@ export class Spidey {
     } catch (error) {
       return false;
     }
+  }
+
+  private savePerMinuteStats() {
+    this.totalStats.requests += this.perMinuteStats.requests;
+    this.totalStats.items += this.perMinuteStats.items;
+    this.totalStats.success += this.perMinuteStats.success;
+    this.totalStats.failed += this.perMinuteStats.failed;
+    this.totalStats.retries += this.perMinuteStats.retries;
+  }
+
+  private resetStats() {
+    this.perMinuteStats = {
+      requests: 0,
+      success: 0,
+      failed: 0,
+      retries: 0,
+      items: 0,
+    };
+  }
+
+  private initializeLogger() {
+    this.logger = createLogger({
+      level: this.options?.logLevel,
+      format: format.combine(
+        format.timestamp({
+          format: 'YYYY-MM-DD HH:mm:ss',
+        }),
+        format.printf((info: any) => {
+          return `${info.level.toUpperCase()}: ${info.timestamp} ${info.message}`;
+        }),
+      ),
+      transports: [new transports.Console()],
+    });
   }
 }

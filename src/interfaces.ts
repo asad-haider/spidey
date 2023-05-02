@@ -20,6 +20,7 @@ export interface SpideyOptions {
   logLevel?: 'info' | 'debug' | 'error';
   proxy?: SpdieyProxy;
   proxyUrl?: string;
+  continuous?: boolean;
 }
 
 export interface RequestOptions {
@@ -45,6 +46,14 @@ export interface SpideyResponse extends AxiosResponse {
 export interface SpideyPipeline {
   process(data: any, last?: boolean): any;
   complete?(): any;
+}
+
+export interface SpideyStatistics {
+  items: number;
+  requests: number;
+  retries: number;
+  success: number;
+  failed: number;
 }
 
 export declare type OutputFormat = 'json' | 'csv' | 'tsv' | 'txt';
