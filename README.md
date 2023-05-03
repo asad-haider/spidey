@@ -1,4 +1,13 @@
 
+[![npm package](https://nodei.co/npm/spidey.png?downloads=true&downloadRank=true&stars=true)](https://nodei.co/npm/spidey/)
+
+[![NPM download][download-image]][download-url]
+[![Package Quality][quality-image]][quality-url]
+
+[quality-image]: https://packagequality.com/shield/spidey.svg
+[quality-url]: https://packagequality.com/#?package=spidey
+[download-image]: https://img.shields.io/npm/dm/spidey.svg?style=flat-square
+[download-url]: https://npmjs.org/package/spidey
 
 # Spidey - Robust Web Scraping Tool
 
