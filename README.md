@@ -80,6 +80,64 @@ class AmazonSpidey extends Spidey {
 new AmazonSpidey().start();
 ```
 
+## Data Pipeline
+
+Spidey enables the creation of personalized data pipelines for storing, validating, and manipulating the data that has been crawled.
+
+### Data Manipulation
+```typescript
+export class ASINPipeline implements SpideyPipeline {
+  constructor(private options?: SpideyOptions) {}
+
+  process(data: Data) {
+    data.url = data.url.split('/ref').shift() as string;
+    data.asin = data.url.split('/').pop() as string;
+    return data;
+  }
+}
+```
+
+### Store Data to Mongodb
+```typescript
+export class MongoPipeline implements SpideyPipeline {
+  client: MongoClient;
+  collection!: Collection;
+
+  constructor(private options?: SpideyOptions) {
+    this.client = new MongoClient(this.options?.mongoUrl);
+  }
+
+  async start() {
+    await this.client.connect();
+    const db = this.client.db(this.options?.mongoDb);
+    this.collection = db.collection(this.options?.mongoCollection);
+  }
+
+  async complete() {
+    await this.client.close();
+  }
+
+  async process(data: Data) {
+    await this.collection.findOneAndUpdate({ asin: data.asin }, { $set: data }, { upsert: true });
+    return data;
+  }
+}
+```
+
+### Pipeline Injection
+Pipelines can be injected to any spidey instance by passing in `pipelines` options.
+```typescript
+
+class AmazonSpidey extends Spidey {
+  constructor() {
+    super({
+      // ...spidey options
+      pipelines: [ASINPipeline, MongoPipeline]
+    });
+  }
+}
+
+```
 
 ## License
 

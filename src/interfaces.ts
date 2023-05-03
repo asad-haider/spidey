@@ -21,6 +21,8 @@ export interface SpideyOptions {
   proxy?: SpdieyProxy;
   proxyUrl?: string;
   continuous?: boolean;
+  pipelines?: ISpideyPipeline[];
+  [key: string]: any;
 }
 
 export interface RequestOptions {
@@ -45,7 +47,8 @@ export interface SpideyResponse extends AxiosResponse {
 
 export interface SpideyPipeline {
   process(data: any, last?: boolean): any;
-  complete?(): any;
+  start?(): void | Promise<void>;
+  complete?(): void | Promise<void>;
 }
 
 export interface SpideyStatistics {
@@ -58,3 +61,4 @@ export interface SpideyStatistics {
 
 export declare type OutputFormat = 'json' | 'csv' | 'tsv' | 'txt';
 export declare type SpideyResponseCallback = (response: SpideyResponse) => void;
+export declare type ISpideyPipeline = new (options?: SpideyOptions) => SpideyPipeline;

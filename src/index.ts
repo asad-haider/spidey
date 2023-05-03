@@ -1,8 +1,8 @@
 import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
 import * as cheerio from 'cheerio';
-import { appendFileSync, existsSync, writeFileSync } from 'fs';
 import Queue from './queue';
 import {
+  ISpideyPipeline,
   RequestOptions,
   SpideyOptions,
   SpideyPipeline,
@@ -17,8 +17,6 @@ import { select } from 'xpath';
 import { DOMParser } from 'xmldom';
 import { JsonPipeline } from './pipeline';
 
-type ISpideyPipeline = new (options?: SpideyOptions) => SpideyPipeline;
-
 export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
 
 export class Spidey {
@@ -27,9 +25,9 @@ export class Spidey {
 
   private requestPipeline: Queue;
   private dataPipeline: Queue;
-  private pipelineRegistry: ISpideyPipeline[] = [];
   private pipeline: SpideyPipeline[] = [];
-  private statsInterval: NodeJS.Timeout;
+  private statsInterval!: NodeJS.Timeout;
+  private stateInterval!: NodeJS.Timeout;
   private totalStats: SpideyStatistics = {
     requests: 0,
     items: 0,
@@ -51,22 +49,11 @@ export class Spidey {
 
     this.initializeLogger();
 
-    this.requestPipeline = new Queue(this.options.concurrency as number, this.options?.continuous as boolean);
+    this.requestPipeline = new Queue(this.options.concurrency as number);
     this.dataPipeline = new Queue(this.options.itemConcurrency as number);
 
-    this.requestPipeline.on('complete', this.onComplete.bind(this));
     this.onStart();
-
-    this.statsInterval = setInterval(() => {
-      this.logger.info(`Crawled ${this.perMinuteStats.requests} pages, ${this.perMinuteStats.items} items per minute`);
-
-      this.savePerMinuteStats();
-      this.resetStats();
-    }, 60 * 1000);
-  }
-
-  use(pipeline: ISpideyPipeline) {
-    this.pipelineRegistry.push(pipeline);
+    this.initializeIntervals();
   }
 
   start() {
@@ -129,22 +116,27 @@ export class Spidey {
     return this.requestPipeline.length();
   }
 
-  private onStart() {
+  private async onStart() {
     this.logger.info(`Spidey process started`);
 
     switch (this.options?.outputFormat) {
       case 'json':
-        this.use(JsonPipeline);
+        this.options?.pipelines?.push(JsonPipeline);
         break;
     }
-    this.pipeline = this.pipelineRegistry.map((Pipeline: ISpideyPipeline) => new Pipeline(this.options));
+    this.pipeline = this.options?.pipelines?.map((Pipeline: ISpideyPipeline) => new Pipeline(this.options)) ?? [];
+
+    // Call start functions in all pipelines
+    for (const pipeline of this.pipeline) if (pipeline.start) await pipeline.start();
   }
 
-  private onComplete() {
-    for (const pipeline of this.pipeline) {
-      if (pipeline.complete) pipeline.complete();
-    }
+  private async onComplete() {
+    // Call complete functions in all pipelines
+    for (const pipeline of this.pipeline) if (pipeline.complete) await pipeline.complete();
+
+    // Clearing statistics interval
     if (this.statsInterval) clearInterval(this.statsInterval);
+    if (this.stateInterval) clearInterval(this.stateInterval);
 
     this.savePerMinuteStats();
     this.logger.info(
@@ -180,10 +172,12 @@ export class Spidey {
     options.retryStatusCode = options?.retryStatusCode || Constants.DEFAULT_RETRY_STATUS_CODE;
     options.logLevel = options?.logLevel || Constants.DEFAULT_DEBUG_LEVEL;
     options.continuous = options.continuous ?? Constants.DEFAULT_SPIDEY_STATE;
+    options.pipelines = options?.pipelines || [];
 
-    options.outputFormat = options?.outputFormat || Constants.DEFAULT_OUTPUT_FORMAT;
-    options.outputFileName = options?.outputFileName || Constants.DEFAULT_OUTPUT_FILE_NAME;
-    if (!options?.outputFileName.endsWith(options.outputFormat)) options.outputFileName += `.${options.outputFormat}`;
+    if (options.outputFormat) {
+      options.outputFileName = options?.outputFileName || Constants.DEFAULT_OUTPUT_FILE_NAME;
+      if (!options?.outputFileName.endsWith(options.outputFormat)) options.outputFileName += `.${options.outputFormat}`;
+    }
 
     return options;
   }
@@ -205,7 +199,7 @@ export class Spidey {
 
   private async processData(data: any) {
     for (const pipeline of this.pipeline) {
-      data = pipeline.process(data, this.requestPipeline.length() === 1);
+      data = await pipeline.process(data, this.requestPipeline.length() === 1);
     }
 
     this.logger.debug(`Crawled ${JSON.stringify(data, null, 2)}`);
@@ -271,5 +265,20 @@ export class Spidey {
       ),
       transports: [new transports.Console()],
     });
+  }
+
+  private initializeIntervals() {
+    this.statsInterval = setInterval(() => {
+      this.logger.info(`Crawled ${this.perMinuteStats.requests} pages, ${this.perMinuteStats.items} items per minute`);
+
+      this.savePerMinuteStats();
+      this.resetStats();
+    }, 60 * 1000);
+
+    if (!this.options?.continuous) {
+      this.stateInterval = setInterval(async () => {
+        if (this.requestPipeline.length() === 0 && this.dataPipeline.length() === 0) await this.onComplete();
+      }, 1000);
+    }
   }
 }
