@@ -1,5 +1,4 @@
 import { Spidey, SpideyOptions, SpideyPipeline, SpideyResponse } from '../dist/index';
-import { MongoClient, Collection, Db } from 'mongodb';
 interface Data {
   url: string;
   asin: string;
