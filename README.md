@@ -89,6 +89,24 @@ class AmazonSpidey extends Spidey {
 new AmazonSpidey().start();
 ```
 
+## Spidey Options
+
+| Configuration      | Type     | Description                                                                                                      | Default Value                                    |
+|--------------------|----------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
+| concurrency        | number   | The number of concurrent requests.                                                                              | 10                                               |
+| delay              | number   | The delay between each request.                                                                                  | 0                                                |
+| retries            | number   | The number of retries for each failed request.                                                                   | 0                                                |
+| retryStatusCode    | number[] | Spidey will retry if it encounters these status codes.                                                           | [500, 502, 503, 504, 522, 524, 408, 429]         |
+| itemConcurrency    | number   | The number of concurrent crawled item processing.                                                               | Same as request concurrency                      |
+| outputFormat       | string   | The output format such as json, csv, tsv.                                                                        | null                                             |
+| outputFileName     | string   | The output format name.                                                                                          | data                                             |
+| logLevel           | string   | The output log level.                                                                                            | debug                                            |
+| proxy              | object   | The proxy configuration.                                                                                         | null                                             |
+| proxyUrl           | string   | The proxy URL configuration.                                                                                     | null                                             |
+| continuous         | boolean  | For long-running Spidey processes such as listening to new URLs from Redis or Kafka.                             | false                                            |
+| pipelines          | SpideyPipeline[] | Item pipeline injection.                                                                                 | []                                               |
+
+
 ## Data Pipeline
 
 Spidey enables the creation of personalized data pipelines for storing, validating, and manipulating the data that has been crawled.
