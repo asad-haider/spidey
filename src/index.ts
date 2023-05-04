@@ -116,6 +116,10 @@ export class Spidey {
     return this.requestPipeline.length();
   }
 
+  getOptions() {
+    return this.options as SpideyOptions;
+  }
+
   private async onStart() {
     this.logger.info(`Spidey process started`);
 
