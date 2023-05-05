@@ -36,6 +36,7 @@ export interface RequestOptions {
   inline?: boolean;
   proxy?: SpdieyProxy;
   proxyUrl?: string;
+  priority?: number;
 }
 
 export interface SpideyResponse extends AxiosResponse {
@@ -57,6 +58,8 @@ export interface SpideyStatistics {
   retries: number;
   success: number;
   failed: number;
+  startTime?: Date;
+  endTime?: Date;
 }
 
 export declare type OutputFormat = 'json' | 'csv' | 'tsv' | 'txt';

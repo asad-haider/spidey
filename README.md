@@ -23,6 +23,7 @@ Spidey is a powerful and reliable web scraping tool that allows users to crawl a
 - Built-in data pipeline and storage format
 - Supports proxies
 - Support custom data pipelines
+- Support requests prioritization
 
 ## Installation
 
@@ -48,7 +49,7 @@ const spidey = new Spidey({
 
 spidey.request({
   url: 'https://example.com',
-  // crawl options...
+  // spidey options...
 }, (response) => {
   const title = response.xpath('//*[@title="Google"]')[0].data;
   const heading = response.$('.heading').text();
@@ -66,6 +67,7 @@ class AmazonSpidey extends Spidey {
     super({
       concurrency: 10,
       retries: 5,
+      // spidey options...
     });
   }
 
@@ -86,10 +88,60 @@ class AmazonSpidey extends Spidey {
   }
 }
 
-new AmazonSpidey().start();
+new MySpidey().start();
 ```
 
+## Request Options
+When making a request using Spidey, you can pass multiple options to customize your request.
+
+```typescript
+this.request(
+  { 
+    url, 
+    headers: this.headers, 
+    // request options...
+  }, 
+  this.parse.bind(this)
+);
+```
+
+| Name | Type | Required | Default | Description |
+|------|------|----------|---------|-------------|
+| url | string | Yes | - | Input URL for the request |
+| method | string | No | `GET` | Request method |
+| headers | any | No | `null` | Request headers |
+| body | any | No | `null` | Request body |
+| json | boolean | No | `false` | If `true`, the response will be converted into JSON |
+| timeout | number | No | `0` | Request timeout in milliseconds. A value of `0` means no timeout |
+| meta | any | No | `{}` | A meta object that can be used to pass metadata from the request to the response function |
+| inline | boolean | No | `false` | If `true`, the response will be returned directly instead of being passed to a callback function |
+| proxy | SpdieyProxy | No | `null` | Proxy configuration |
+| proxyUrl | string | No | `null` | Proxy configuration as a URL |
+| priority | number | No | `null` | Request priority. A number between 0-9, where 0 is highest priority and 9 is lowest priority. If not specified, no priority is assigned. |
+
+
+
 ## Spidey Options
+You can pass Spidey options to a Spidey instance
+
+```javascript
+const spidey = new Spidey({
+  // spidey options...
+});
+
+```
+OR
+
+```typescript
+class MySpidey extends Spidey {
+  constructor() {
+    super({
+      // spidey options...
+    });
+  }
+}
+
+```
 
 | Configuration      | Type     | Description                                                                                                      | Default Value                                    |
 |--------------------|----------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
@@ -146,12 +198,14 @@ export class MongoPipeline implements SpideyPipeline {
 
   async process(data: Data) {
     await this.collection.findOneAndUpdate({ asin: data.asin }, { $set: data }, { upsert: true });
+
+    // Always return data back in pipelines in process function
     return data;
   }
 }
 ```
 
-### Pipeline Injection
+### Pipeline Usage
 Pipelines can be injected to any spidey instance by passing in `pipelines` options.
 ```typescript
 

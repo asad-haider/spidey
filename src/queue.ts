@@ -1,50 +1,33 @@
+import Bottleneck from 'bottleneck';
+
+interface QueueOptions {
+  concurrency: number;
+  delay?: number;
+}
+
+interface QueueTaskOptions {
+  priority?: number;
+}
+
 export default class Queue<T = any> {
-  private queue: (() => Promise<T>)[] = [];
-  private activeTasks: number = 0;
-  private concurrency: number;
-  private continuous = false;
+  private queue: Bottleneck;
 
-  public constructor(concurrency: number) {
-    if (concurrency < 0) {
-      throw new Error('Limit cant be lower than 0.');
+  public constructor(options: QueueOptions) {
+    if (options.concurrency < 0) {
+      throw new Error('Concurrency cannot be lower than 0.');
     }
 
-    this.concurrency = concurrency;
-  }
-
-  private registerTask(handler: any) {
-    this.queue = [...this.queue, handler];
-    this.executeTasks();
-  }
-
-  private executeTasks() {
-    while (this.queue.length && this.activeTasks < this.concurrency) {
-      const task = this.queue[0];
-      this.queue = this.queue.slice(1);
-      this.activeTasks += 1;
-
-      if (task)
-        task()
-          .then((result) => {
-            this.activeTasks -= 1;
-            this.executeTasks();
-
-            return result;
-          })
-          .catch((err) => {
-            this.activeTasks -= 1;
-            this.executeTasks();
-
-            throw err;
-          });
-    }
+    this.queue = new Bottleneck({ maxConcurrent: options.concurrency, minTime: options.delay });
   }
 
   public length() {
-    return this.activeTasks;
+    const counts = this.queue.counts();
+    return counts.EXECUTING + counts.QUEUED + counts.RECEIVED + counts.RUNNING;
   }
 
-  public task(handler: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => this.registerTask(() => handler().then(resolve).catch(reject)));
+  public task(options: QueueTaskOptions, handler: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) =>
+      this.queue.schedule({ ...options }, () => handler().then(resolve).catch(reject)),
+    );
   }
 }

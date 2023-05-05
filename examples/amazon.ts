@@ -18,9 +18,8 @@ export class ASINPipeline implements SpideyPipeline {
 class AmazonSpidey extends Spidey {
   constructor() {
     super({
-      concurrency: 50,
-      retries: 5,
-      logLevel: 'debug',
+      concurrency: 10,
+      retries: 3,
       pipelines: [ASINPipeline],
     });
   }
@@ -38,13 +37,7 @@ class AmazonSpidey extends Spidey {
 
   start() {
     for (const url of this.startUrls) {
-      this.request(
-        {
-          url,
-          headers: this.headers,
-        },
-        this.parse.bind(this),
-      );
+      this.request({ url, headers: this.headers }, this.parse.bind(this));
     }
   }
 
@@ -59,10 +52,9 @@ class AmazonSpidey extends Spidey {
       this.request(
         {
           url,
+          priority: 1, // these requests will have more priority
+          meta: { url },
           headers: this.headers,
-          meta: {
-            url,
-          },
         },
         this.parseProduct.bind(this),
       );
@@ -70,7 +62,7 @@ class AmazonSpidey extends Spidey {
   }
 
   parseProduct(response: SpideyResponse) {
-    const url = response.meta.url;
+    const url = response.url;
     const title = response.xpath('//*[@id="productTitle"]/text()')[0].data.trim();
     this.save({ url, title });
   }
