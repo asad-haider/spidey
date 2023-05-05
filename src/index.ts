@@ -49,8 +49,11 @@ export class Spidey {
 
     this.initializeLogger();
 
-    this.requestPipeline = new Queue(this.options.concurrency as number);
-    this.dataPipeline = new Queue(this.options.itemConcurrency as number);
+    this.requestPipeline = new Queue({
+      concurrency: this.options.concurrency as number,
+      delay: this.options.delay as number,
+    });
+    this.dataPipeline = new Queue({ concurrency: this.options.itemConcurrency as number });
 
     this.onStart();
     this.initializeIntervals();
@@ -69,27 +72,31 @@ export class Spidey {
   async request(options: RequestOptions, callback: SpideyResponseCallback): Promise<void | SpideyResponse> {
     options.method = options.method || 'GET';
     const result = await this.requestPipeline.task(async () => {
-      this.perMinuteStats.requests++;
+      if (!options?.meta?.retryCount) this.perMinuteStats.requests++;
       try {
         const response = await this.processRequest(options);
         this.logger.debug(`${options.method}<${response.status}> ${options.url}`);
         return { success: true, response };
       } catch (error: any) {
         const statusCode = error?.response?.status;
-        const retryCount = options.meta?.retryCount || 0;
+        let retryCount = options.meta?.retryCount || 0;
 
         if (
           (!error?.response || this.options?.retryStatusCode?.includes(statusCode)) &&
           retryCount < (this.options?.retries as number)
         ) {
-          if (statusCode) this.logger.debug(`Failed, retrying ${options.method}<${statusCode}> ${options.url}`);
-          else this.logger.debug(`Failed, retrying ${options.method} ${options.url}`);
-          options.meta = { ...options.meta, retryCount: retryCount + 1 };
+          retryCount++;
+          if (statusCode)
+            this.logger.debug(
+              `Failed: Retrying(Retry Times: ${retryCount}) ${options.method}<${statusCode}> ${options.url}`,
+            );
+          else this.logger.debug(`Failed: Retrying(Retry Times: ${retryCount}) ${options.method} ${options.url}`);
+          options.meta = { ...options.meta, retryCount };
           this.perMinuteStats.retries++;
           return { success: false, retry: true };
         } else {
-          if (statusCode) this.logger.debug(`Failed ${options.method}<${statusCode}> ${options.url}`);
-          else this.logger.debug(`Failed ${options.method} ${options.url}`);
+          if (statusCode) this.logger.error(`Failed ${options.method}<${statusCode}> ${options.url}`);
+          else this.logger.error(`Failed ${options.method} ${options.url}`);
           this.perMinuteStats.failed++;
           return { success: false, retry: false };
         }
@@ -122,6 +129,7 @@ export class Spidey {
 
   private async onStart() {
     this.logger.info(`Spidey process started`);
+    this.totalStats.startTime = new Date();
 
     switch (this.options?.outputFormat) {
       case 'json':
@@ -135,6 +143,8 @@ export class Spidey {
   }
 
   private async onComplete() {
+    this.totalStats.endTime = new Date();
+
     // Call complete functions in all pipelines
     for (const pipeline of this.pipeline) if (pipeline.complete) await pipeline.complete();
 
@@ -143,9 +153,7 @@ export class Spidey {
     if (this.stateInterval) clearInterval(this.stateInterval);
 
     this.savePerMinuteStats();
-    this.logger.info(
-      `Spidey process completed\nTotal Requests: ${this.totalStats.requests}\nTotal Items: ${this.totalStats.items}\nTotal Success: ${this.totalStats.success}\nTotal Failed: ${this.totalStats.failed}\nTotal Retries: ${this.totalStats.retries}`,
-    );
+    this.printLogs();
   }
 
   private getSpideyResponse(options: RequestOptions, result: any) {
@@ -284,5 +292,16 @@ export class Spidey {
         if (this.requestPipeline.length() === 0 && this.dataPipeline.length() === 0) await this.onComplete();
       }, 1000);
     }
+  }
+
+  private printLogs() {
+    this.logger.info('Spidey process completed');
+    this.logger.info(`Start: ${this.totalStats.startTime?.toISOString()}`);
+    this.logger.info(`Complete: ${this.totalStats.endTime?.toISOString()}`);
+    this.logger.info(`Total Requests: ${this.totalStats.requests}`);
+    this.logger.info(`Total Items: ${this.totalStats.items}`);
+    this.logger.info(`Total Success: ${this.totalStats.success}`);
+    this.logger.info(`Total Failed: ${this.totalStats.failed}`);
+    this.logger.info(`Total Retries: ${this.totalStats.retries}`);
   }
 }

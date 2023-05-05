@@ -57,6 +57,8 @@ export interface SpideyStatistics {
   retries: number;
   success: number;
   failed: number;
+  startTime?: Date;
+  endTime?: Date;
 }
 
 export declare type OutputFormat = 'json' | 'csv' | 'tsv' | 'txt';
