@@ -5,6 +5,10 @@ interface QueueOptions {
   delay?: number;
 }
 
+interface QueueTaskOptions {
+  priority?: number;
+}
+
 export default class Queue<T = any> {
   private queue: Bottleneck;
 
@@ -21,7 +25,9 @@ export default class Queue<T = any> {
     return counts.EXECUTING + counts.QUEUED + counts.RECEIVED + counts.RUNNING;
   }
 
-  public task(handler: () => Promise<T>): Promise<T> {
-    return new Promise((resolve, reject) => this.queue.schedule(() => handler().then(resolve).catch(reject)));
+  public task(options: QueueTaskOptions, handler: () => Promise<T>): Promise<T> {
+    return new Promise((resolve, reject) =>
+      this.queue.schedule({ ...options }, () => handler().then(resolve).catch(reject)),
+    );
   }
 }

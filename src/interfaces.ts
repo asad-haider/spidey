@@ -36,6 +36,7 @@ export interface RequestOptions {
   inline?: boolean;
   proxy?: SpdieyProxy;
   proxyUrl?: string;
+  priority?: number;
 }
 
 export interface SpideyResponse extends AxiosResponse {

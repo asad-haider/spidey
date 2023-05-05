@@ -71,7 +71,8 @@ export class Spidey {
 
   async request(options: RequestOptions, callback: SpideyResponseCallback): Promise<void | SpideyResponse> {
     options.method = options.method || 'GET';
-    const result = await this.requestPipeline.task(async () => {
+    const taskOptions = { priority: options.priority };
+    const result = await this.requestPipeline.task(taskOptions, async () => {
       if (!options?.meta?.retryCount) this.perMinuteStats.requests++;
       try {
         const response = await this.processRequest(options);
@@ -113,7 +114,7 @@ export class Spidey {
   }
 
   save(data: any) {
-    this.dataPipeline.task(() => {
+    this.dataPipeline.task({}, () => {
       this.perMinuteStats.items++;
       return this.processData(data);
     });
