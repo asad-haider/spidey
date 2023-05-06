@@ -1,4 +1,4 @@
-import { appendFileSync, existsSync, writeFileSync } from 'fs';
+import { appendFileSync, existsSync, readFileSync, writeFileSync } from 'fs';
 import { SpideyOptions, SpideyPipeline } from './interfaces';
 
 export class JsonPipeline implements SpideyPipeline {
@@ -9,13 +9,19 @@ export class JsonPipeline implements SpideyPipeline {
     writeFileSync(this.fileName, '[\n');
   }
 
-  process(data: any, last?: boolean) {
-    if (last) appendFileSync(this.fileName, JSON.stringify(data) + '\n');
-    else appendFileSync(this.fileName, JSON.stringify(data) + ',\n');
+  process(data: any) {
+    appendFileSync(this.fileName, JSON.stringify(data) + ',\n');
     return data;
   }
 
   complete() {
+    this.replaceLastComma();
     appendFileSync(this.fileName, ']');
+  }
+
+  private replaceLastComma() {
+    let content = readFileSync(this.fileName, 'utf-8');
+    content = content.replace(/,\n$/, '\n');
+    writeFileSync(this.fileName, content);
   }
 }

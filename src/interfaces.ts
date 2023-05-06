@@ -46,9 +46,9 @@ export interface SpideyResponse extends AxiosResponse {
   url: string;
 }
 
-export interface SpideyPipeline {
-  process(data: any, last?: boolean): any;
+export interface SpideyPipeline<T = any> {
   start?(): void | Promise<void>;
+  process(data: T): T | Promise<T>;
   complete?(): void | Promise<void>;
 }
 

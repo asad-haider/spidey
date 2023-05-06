@@ -17,9 +17,14 @@ import { select } from 'xpath';
 import { DOMParser } from 'xmldom';
 import { JsonPipeline } from './pipeline';
 
-export { SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline };
+class DiscardItemError extends Error {
+  constructor(message?: string) {
+    super(message);
+    this.name = 'DiscardItem';
+  }
+}
 
-export class Spidey {
+class Spidey {
   logger!: Logger;
   startUrls: string[] = [];
 
@@ -114,10 +119,7 @@ export class Spidey {
   }
 
   save(data: any) {
-    this.dataPipeline.task({}, () => {
-      this.perMinuteStats.items++;
-      return this.processData(data);
-    });
+    this.dataPipeline.task({}, () => this.processData(data));
   }
 
   scheduledRequestsCount() {
@@ -211,11 +213,16 @@ export class Spidey {
   }
 
   private async processData(data: any) {
-    for (const pipeline of this.pipeline) {
-      data = await pipeline.process(data, this.requestPipeline.length() === 1);
+    try {
+      for (const pipeline of this.pipeline) if (data) data = await pipeline.process(data);
+      if (data) {
+        this.perMinuteStats.items++;
+        this.logger.debug(`Crawled ${JSON.stringify(data, null, 2)}`);
+      }
+    } catch (error: any) {
+      if (error instanceof DiscardItemError) return this.logger.error(`Discard Item: ${error.message}`);
+      return this.logger.error(`Error: ${error.message}`);
     }
-
-    this.logger.debug(`Crawled ${JSON.stringify(data, null, 2)}`);
   }
 
   private getProxy(requestOptions?: RequestOptions) {
@@ -306,3 +313,5 @@ export class Spidey {
     this.logger.info(`Total Retries: ${this.totalStats.retries}`);
   }
 }
+
+export { Spidey, SpideyOptions, RequestOptions, SpideyResponse, SpideyPipeline, DiscardItemError };

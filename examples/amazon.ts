@@ -5,7 +5,7 @@ interface Data {
   title: string;
 }
 
-export class ASINPipeline implements SpideyPipeline {
+export class ASINPipeline implements SpideyPipeline<Data> {
   constructor(private options?: SpideyOptions) {}
 
   process(data: Data) {
