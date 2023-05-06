@@ -16,13 +16,7 @@ import { parse } from 'url';
 import { select } from 'xpath';
 import { DOMParser } from 'xmldom';
 import { JsonPipeline } from './pipeline';
-
-class DiscardItemError extends Error {
-  constructor(message?: string) {
-    super(message);
-    this.name = 'DiscardItem';
-  }
-}
+import { DiscardItemError } from './errors';
 
 class Spidey {
   logger!: Logger;
