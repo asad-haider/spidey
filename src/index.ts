@@ -1,4 +1,4 @@
-import axios, { AxiosProxyConfig, AxiosResponse } from 'axios';
+import axios, { AxiosProxyConfig, AxiosResponse, ResponseType } from 'axios';
 import * as cheerio from 'cheerio';
 import Queue from './queue';
 import {
@@ -17,6 +17,10 @@ import { select } from 'xpath';
 import { DOMParser } from 'xmldom';
 import { JsonPipeline } from './pipeline';
 import { DiscardItemError } from './errors';
+import { createWriteStream, mkdirSync } from 'fs';
+import { promisify } from 'util';
+import * as stream from 'stream';
+const pipeline = promisify(stream.pipeline);
 
 class Spidey {
   logger!: Logger;
@@ -68,7 +72,7 @@ class Spidey {
     return;
   }
 
-  async request(options: RequestOptions, callback: SpideyResponseCallback): Promise<void | SpideyResponse> {
+  async request(options: RequestOptions, callback?: SpideyResponseCallback): Promise<void | SpideyResponse> {
     options.method = options.method || 'GET';
     const taskOptions = { priority: options.priority };
     const result = await this.requestPipeline.task(taskOptions, async () => {
@@ -76,6 +80,12 @@ class Spidey {
       try {
         const response = await this.processRequest(options);
         this.logger.debug(`${options.method}<${response.status}> ${options.url}`);
+
+        if (options.download) {
+          const downloadResponse = await this.downloadFile(options, response);
+          return { success: true, response: downloadResponse };
+        }
+
         return { success: true, response };
       } catch (error: any) {
         const statusCode = error?.response?.status;
@@ -109,7 +119,8 @@ class Spidey {
     const spideyResponse = this.getSpideyResponse(options, result);
     this.perMinuteStats.success++;
     if (options.inline) return spideyResponse;
-    return callback(spideyResponse);
+    if (callback) return callback(spideyResponse);
+    return;
   }
 
   save(data: any) {
@@ -136,14 +147,14 @@ class Spidey {
     this.pipeline = this.options?.pipelines?.map((Pipeline: ISpideyPipeline) => new Pipeline(this.options)) ?? [];
 
     // Call start functions in all pipelines
-    for (const pipeline of this.pipeline) if (pipeline.start) await pipeline.start();
+    for (const _pipeline of this.pipeline) if (_pipeline.start) await _pipeline.start();
   }
 
   private async onComplete() {
     this.totalStats.endTime = new Date();
 
     // Call complete functions in all pipelines
-    for (const pipeline of this.pipeline) if (pipeline.complete) await pipeline.complete();
+    for (const _pipeline of this.pipeline) if (_pipeline.complete) await _pipeline.complete();
 
     // Clearing statistics interval
     if (this.statsInterval) clearInterval(this.statsInterval);
@@ -154,22 +165,26 @@ class Spidey {
   }
 
   private getSpideyResponse(options: RequestOptions, result: any) {
-    const tree = new DOMParser({
-      locator: {},
-      errorHandler: {
-        error: () => undefined,
-        warning: () => undefined,
-        fatalError: () => undefined,
-      },
-    }).parseFromString(result.response.data, 'text/html');
-
-    return {
+    const response = {
       ...result.response,
       meta: options?.meta,
       url: result.response.config.url,
-      $: cheerio.load(result.response.data),
-      xpath: (selector: string, node?: any) => select(selector, node ?? tree),
     };
+
+    if (!options.download) {
+      const tree = new DOMParser({
+        locator: {},
+        errorHandler: {
+          error: () => undefined,
+          warning: () => undefined,
+          fatalError: () => undefined,
+        },
+      }).parseFromString(result.response.data, 'text/html');
+      response.$ = cheerio.load(result.response.data);
+      response.xpath = (selector: string, node?: any) => select(selector, node ?? tree);
+    }
+
+    return response;
   }
 
   private setDefaultOptions(options?: SpideyOptions) {
@@ -181,6 +196,7 @@ class Spidey {
     options.retryStatusCode = options?.retryStatusCode || Constants.DEFAULT_RETRY_STATUS_CODE;
     options.logLevel = options?.logLevel || Constants.DEFAULT_DEBUG_LEVEL;
     options.continuous = options.continuous ?? Constants.DEFAULT_SPIDEY_STATE;
+    options.downloadDir = options?.downloadDir || Constants.DEFAULT_DOWNLOAD_DIR;
     options.pipelines = options?.pipelines || [];
 
     if (options.outputFormat) {
@@ -192,14 +208,22 @@ class Spidey {
   }
 
   private async processRequest(options: RequestOptions): Promise<AxiosResponse> {
+    let responseType: ResponseType;
+    if (options.json) responseType = 'json';
+    else if (options.download) responseType = 'stream';
+    else responseType = 'document';
+
     return axios.request({
       url: options.url,
       method: options.method,
-      headers: options.headers,
+      headers: {
+        ...this.options?.headers,
+        ...options.headers,
+      },
       data: options.body,
       timeout: options.timeout,
       withCredentials: true,
-      responseType: options.json ? 'json' : 'document',
+      responseType,
       validateStatus: (status) => status < 400,
       maxRedirects: 3,
       proxy: this.getProxy(options),
@@ -208,7 +232,7 @@ class Spidey {
 
   private async processData(data: any) {
     try {
-      for (const pipeline of this.pipeline) if (data) data = await pipeline.process(data);
+      for (const _pipeline of this.pipeline) if (data) data = await _pipeline.process(data);
       if (data) {
         this.perMinuteStats.items++;
         this.logger.debug(`Crawled ${JSON.stringify(data, null, 2)}`);
@@ -305,6 +329,27 @@ class Spidey {
     this.logger.info(`Total Success: ${this.totalStats.success}`);
     this.logger.info(`Total Failed: ${this.totalStats.failed}`);
     this.logger.info(`Total Retries: ${this.totalStats.retries}`);
+  }
+
+  private async downloadFile(options: RequestOptions, response: any) {
+    const url = response.config.url;
+    const fileName = url.split('/').pop();
+
+    // Create directory if not exists
+    mkdirSync(this.options?.downloadDir as string, { recursive: true });
+
+    // Downloading file
+    const completeFileName = `${this.options?.downloadDir}/${fileName}`;
+    await pipeline(response.data, createWriteStream(completeFileName));
+
+    return {
+      url,
+      ...response,
+      meta: {
+        ...options.meta,
+        fileName: completeFileName,
+      },
+    };
   }
 }
 

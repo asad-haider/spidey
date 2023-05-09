@@ -9,4 +9,5 @@ export class Constants {
   static readonly DEFAULT_OUTPUT_FILE_NAME = 'data';
   static readonly DEFAULT_RETRY_STATUS_CODE = [500, 502, 503, 504, 522, 524, 408, 429];
   static readonly DEFAULT_SPIDEY_STATE = false;
+  static readonly DEFAULT_DOWNLOAD_DIR = '.';
 }

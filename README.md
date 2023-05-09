@@ -118,6 +118,7 @@ this.request(
 | proxy | SpdieyProxy | No | `null` | Proxy configuration |
 | proxyUrl | string | No | `null` | Proxy configuration as a URL |
 | priority | number | No | `null` | Request priority. A number between 0-9, where 0 is highest priority and 9 is lowest priority. If not specified, no priority is assigned. |
+| download | boolean | No | `false` | If `true`, the response will be saved to file at root directory or given `downloadDir`. This option is useful in downloading files |
 
 
 
@@ -143,20 +144,21 @@ class MySpidey extends Spidey {
 
 ```
 
-| Configuration      | Type     | Description                                                                                                      | Default Value                                    |
-|--------------------|----------|------------------------------------------------------------------------------------------------------------------|--------------------------------------------------|
-| concurrency        | number   | The number of concurrent requests.                                                                              | 10                                               |
-| delay              | number   | The delay between each request.                                                                                  | 0                                                |
-| retries            | number   | The number of retries for each failed request.                                                                   | 0                                                |
-| retryStatusCode    | number[] | Spidey will retry if it encounters these status codes.                                                           | [500, 502, 503, 504, 522, 524, 408, 429]         |
-| itemConcurrency    | number   | The number of concurrent crawled item processing.                                                               | Same as request concurrency                      |
-| outputFormat       | string   | The output format such as json, csv, tsv.                                                                        | null                                             |
-| outputFileName     | string   | The output format name.                                                                                          | data                                             |
-| logLevel           | string   | The output log level.                                                                                            | debug                                            |
-| proxy              | object   | The proxy configuration.                                                                                         | null                                             |
-| proxyUrl           | string   | The proxy URL configuration.                                                                                     | null                                             |
-| continuous         | boolean  | For long-running Spidey processes such as listening to new URLs from Redis or Kafka.                             | false                                            |
-| pipelines          | SpideyPipeline[] | Item pipeline injection.                                                                                 | []                                               |
+| Configuration      | Type     | Description                                                                                                      | Default Value                                      |
+|--------------------|----------|------------------------------------------------------------------------------------------------------------------|----------------------------------------------------|
+| concurrency        | number   | The number of concurrent requests.                                                                               | `10`                                               |
+| delay              | number   | The delay between each request.                                                                                  | `0`                                                |
+| retries            | number   | The number of retries for each failed request.                                                                   | `0`                                                |
+| retryStatusCode    | number[] | Spidey will retry if it encounters these status codes.                                                           | `[500, 502, 503, 504, 522, 524, 408, 429]`         |
+| itemConcurrency    | number   | The number of concurrent crawled item processing.                                                                | Same as request concurrency                        |
+| outputFormat       | string   | The output format such as json, csv, tsv.                                                                        | `null`                                             |
+| outputFileName     | string   | The output format name.                                                                                          | `data`                                             |
+| logLevel           | string   | The output log level.                                                                                            | `debug`                                            |
+| proxy              | object   | The proxy configuration.                                                                                         | `null`                                             |
+| proxyUrl           | string   | The proxy URL configuration.                                                                                     | `null`                                             |
+| continuous         | boolean  | For long-running Spidey processes such as listening to new URLs from Redis or Kafka.                             | `false`                                            |
+| pipelines          | SpideyPipeline[] | Item pipeline injection.                                                                                 | `[]`                                               |
+| downloadDir        | boolean  | Download folder directory.                                                                                       | `.` Current directory                              |
 
 
 ## Data Pipeline

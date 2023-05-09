@@ -18,8 +18,10 @@ export class ASINPipeline implements SpideyPipeline<Data> {
 class AmazonSpidey extends Spidey {
   constructor() {
     super({
-      concurrency: 10,
+      concurrency: 2,
       retries: 3,
+      // Default directory will be the roof of the project
+      downloadDir: './downloads',
       pipelines: [ASINPipeline],
     });
   }
@@ -32,7 +34,7 @@ class AmazonSpidey extends Spidey {
   startUrls = [
     'https://www.amazon.de/-/en/gp/bestsellers/beauty/64272031/ref=zg_bs_nav_beauty_1',
     'https://www.amazon.de/-/en/gp/bestsellers/beauty/122877031/ref=zg_bs_nav_beauty_1',
-    'https://www.amazon.de/-/en/gp/bestsellers/beauty/64486031/ref=zg_bs_nav_beauty_1',
+    'https://www.amazon.de/-/en/gp/bestsellers/beauty/122876031/ref=zg_bs_nav_beauty_1',
   ];
 
   start() {
@@ -61,10 +63,15 @@ class AmazonSpidey extends Spidey {
     });
   }
 
-  parseProduct(response: SpideyResponse) {
+  async parseProduct(response: SpideyResponse) {
     const url = response.url;
     const title = response.xpath('//*[@id="productTitle"]/text()')[0].data.trim();
-    this.save({ url, title });
+    const imageUrl = response.$('#imgTagWrapperId > img').attr('src');
+    this.save({ url, title, imageUrl });
+
+    // To download images, set download to true in request options
+    // File name can be found in response.meta.fileName
+    this.request({ url: imageUrl, download: true });
   }
 }
 

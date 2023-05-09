@@ -22,6 +22,8 @@ export interface SpideyOptions {
   proxyUrl?: string;
   continuous?: boolean;
   pipelines?: ISpideyPipeline[];
+  downloadDir?: string;
+  headers?: any;
   [key: string]: any;
 }
 
@@ -37,6 +39,7 @@ export interface RequestOptions {
   proxy?: SpdieyProxy;
   proxyUrl?: string;
   priority?: number;
+  download?: boolean;
 }
 
 export interface SpideyResponse extends AxiosResponse {
