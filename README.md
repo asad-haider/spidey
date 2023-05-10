@@ -53,7 +53,7 @@ spidey.request({
 }, (response) => {
   const title = response.xpath('//*[@title="Google"]')[0].data;
   const heading = response.$('.heading').text();
-  this.save({ title, heading );  
+  spidey.save({ title, heading });  
 });
 
 spider.start();
